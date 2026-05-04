@@ -31,6 +31,10 @@ func (r *RedisRegistry) HeartBeat(ctx context.Context, serverID string) error {
 	return r.client.Set(ctx, serverID, 0, 5*time.Minute).Err()
 }
 
-func (r *RedisRegistry) GetValueByKey(ctx context.Context, key string) (string, error) {
+func (r *RedisRegistry) GetServerByClient(ctx context.Context, key string) (string, error) {
 	return r.client.HGet(ctx, connectionRegistryKey, key).Result()
+}
+
+func (r *RedisRegistry) GetValueByKey(ctx context.Context, key string) (string, error) {
+	return r.client.Get(ctx, key).Result()
 }

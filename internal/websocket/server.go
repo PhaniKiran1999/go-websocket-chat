@@ -128,9 +128,17 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		recipientServerID, err := s.registry.GetValueByKey(s.ctx, message.RecipientName)
+		//retrive serverID
+		recipientServerID, err := s.registry.GetServerByClient(s.ctx, message.RecipientName)
 		if err != nil {
 			log.Printf("unable to find recipientServerID: %v", err)
+			continue
+		}
+
+		// check if that server is alive
+		_, err = s.registry.GetValueByKey(s.ctx, recipientServerID)
+		if err != nil {
+			log.Printf("recipient server instance is offline: %v", err)
 			continue
 		}
 
