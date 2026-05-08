@@ -48,7 +48,12 @@ func NewServer(serverID string, hub *Hub, registry repository.ConnectionRegistry
 
 	go func() {
 		for message := range msgCh {
-			err := hub.sendTo(message.RecipientName, []byte(message.Payload))
+			payload, err := json.Marshal(message)
+			if err != nil {
+				log.Printf("unable to marshal message: %v", err)
+				continue
+			}
+			err = hub.sendTo(message.RecipientName, payload)
 			if err != nil {
 				log.Printf("unable to forward message: %v", err)
 			}
@@ -164,13 +169,13 @@ func (s *Server) GetConnectedClients(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-
+	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(names); err != nil {
 		log.Printf("unable to encode connected clients: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
+		return
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) SendMessageTo(w http.ResponseWriter, r *http.Request) {

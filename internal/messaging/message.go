@@ -1,6 +1,8 @@
 package messaging
 
 type Message struct {
+	SenderName    string `json:"sender_name"`
 	RecipientName string `json:"recipient_name"`
-	Payload       string `json:"body"`
+	SentAt        int64  `json:"sent_at"`
+	Payload       string `json:"payload"`
 }
