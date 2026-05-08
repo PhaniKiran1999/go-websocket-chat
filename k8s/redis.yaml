@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-deployment
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: redis
+  template: # This is the blueprint for the Pod
+    metadata:
+      labels:
+        app: redis # This tells the Deployment controller. Go find all Pods in the cluster that have the label app: redis. Those belong to me, and I am responsible for managing them.
+    spec:
+      containers:
+      - name: redis # Every new pod created by deployment will be assigned this name and Note: selector.metaLabels label should be same as this because selector.matchLabels is telling the deployment controller that it has to manage all the pods with label app: redis.
+        image: redis:latest
+        ports:
+        - containerPort: 6379
+
+---
+
+apiVersion: v1
+kind: Service # The service acts like a load balancer by constantly scanning the cluster if there are any pods that has the label `app: redis` and routes traffic to them.
+metadata:
+  name: redis-service # internal dns name.
+spec:
+  selector:
+    app: redis # routes traffic to pods with 
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379

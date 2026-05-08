@@ -109,6 +109,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		s.hub.Remove(client)
+		s.registry.UnRegister(s.ctx, client.Name)
 		_ = conn.Close()
 		log.Printf("[-] disconnected: %s (total: %d)", client.ID, s.hub.Count())
 	}()
@@ -151,23 +152,28 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) GetConnectedClients(w http.ResponseWriter, r *http.Request) {
 	// clientIDs := s.connectedClientIDs()
-	names := s.hub.Names()
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(names); err != nil {
-		log.Printf("unable to encode connected clients: %v", err)
-	}
-}
-
-func (s *Server) SendMessageTo(w http.ResponseWriter, r *http.Request) {
-	recipientName := r.Header.Get("client_name")
-	if recipientName == "" {
-		http.Error(w, "client_name header is required", http.StatusBadRequest)
+	connectionRegistryMap, err := s.registry.GetAllKeys(s.ctx)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	var names = make([]string, 0, len(connectionRegistryMap))
+	for key, _ := range connectionRegistryMap {
+		names = append(names, key)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(names); err != nil {
+		log.Printf("unable to encode connected clients: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) SendMessageTo(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -175,10 +181,35 @@ func (s *Server) SendMessageTo(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	if err := s.hub.sendTo(recipientName, data); err != nil {
+	var message messaging.Message
+	if err := json.Unmarshal(data, &message); err != nil {
+		log.Printf("unable to parse message: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	//retrive serverID
+	recipientServerID, err := s.registry.GetServerByClient(s.ctx, message.RecipientName)
+	if err != nil {
+		log.Printf("unable to find recipientServerID: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// check if that server is alive
+	_, err = s.registry.GetValueByKey(s.ctx, recipientServerID)
+	if err != nil {
+		log.Printf("recipient server instance is offline: %v", err)
+		w.WriteHeader(http.StatusBadGateway) // not sure what error code to return
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	if err := s.pubsub.Publish(s.ctx, utils.ConstructRedisChannelKey(recipientServerID), message); err != nil {
+		log.Printf("unable to forward message: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
 	w.WriteHeader(http.StatusAccepted)
 }

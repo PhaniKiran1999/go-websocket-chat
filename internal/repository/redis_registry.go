@@ -38,3 +38,7 @@ func (r *RedisRegistry) GetServerByClient(ctx context.Context, key string) (stri
 func (r *RedisRegistry) GetValueByKey(ctx context.Context, key string) (string, error) {
 	return r.client.Get(ctx, key).Result()
 }
+
+func (r *RedisRegistry) GetAllKeys(ctx context.Context) (map[string]string, error) {
+	return r.client.HGetAll(ctx, connectionRegistryKey).Result()
+}

@@ -10,4 +10,5 @@ type ConnectionRegistry interface {
 	HeartBeat(ctx context.Context, serverID string) error
 	GetServerByClient(ctx context.Context, clientName string) (string, error)
 	GetValueByKey(ctx context.Context, key string) (string, error)
+	GetAllKeys(ctx context.Context) (map[string]string, error)
 }

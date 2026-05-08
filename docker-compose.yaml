@@ -1,0 +1,31 @@
+services:
+  # Service 1: redis db for registry and pub/sub arch
+  redis:
+    image: redis:latest
+    command: ["redis-server", "--port", "7777"]
+    ports:
+      - "6379:7777" # maps host machine port 6379 to containers port 6379
+    volumes:
+      - redis_data:/data # persists redis data even if the container restarts. on host machine data is redis data is present at redis_data and is mapped to /data directory on container.
+    restart: always #Restarts the container regardless of why it stopped—even if it exited successfully with a code of 0
+
+  chat-app:
+    image: go-websocket-chat-app:v1.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080" #host port 8080 to app's websocket port.
+    environment:
+      - HTTP_ADDR=:8080 # reason for not specifying the ip is because HTTP_ADDR is a binding address. It tells Go HTTP server (http.ListenAndServe) which network interface on its own machine to listen to. we want it to listen on port 8080 and for all source ip addresses i.e 0.0.0.0
+      - REDIS_ADDR=redis:7777 # here, redis is specific to the service inside the container that we want to reach out to i.e destination ip address.
+    depends_on:
+      - redis
+    restart: on-failure #Only restart the container if it exits with a non-zero status code, which indicates an error.
+
+volumes:
+  redis_data:
+    driver: local # It stores data on the local filesystem where Docker is running.
+
+
+

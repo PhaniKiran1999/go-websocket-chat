@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: chat-app-deployment
+spec:
+  replicas: 3 
+  selector:
+    matchLabels:
+      app: chat-app
+  template:
+    metadata:
+      labels:
+        app: chat-app
+    spec:
+      initContainers:
+      - name: wait-for-redis
+        image: redis:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - until redis-cli -h redis-service -p 6379 ping | grep PONG; do echo "waiting for redis"; sleep 2; done
+      containers:
+      - name: chat-app
+        image: go-websocket-chat-app:v1.0 # This takes the image locally.
+        imagePullPolicy: Never # Tells local k8s to use local docker image.
+        ports:
+        - containerPort: 8080
+        env:
+        - name: HTTP_ADDR
+          value: ":8080"
+        - name: REDIS_ADDR
+          value: "redis-service:6379" # points to metadata.name of redis service.
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: chat-app-service
+
+spec:
+  type: NodePort # exposes the service to your host machine
+  selector:
+    app: chat-app
+  ports:
+    - protocol: TCP
+      port: 8080 # port inside k8
+      targetPort: 8080 # port go app is listening on
+      nodePort: 30080 # port to access from host machine 
+
+
+
+
+
+
+ 
